@@ -8,63 +8,78 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public class LeanovateHttpUrlConnection 
 {
-
+  // constants
   private static final String USER_AGENT = "niagara-leanovate/1.0";
   private static final String USERNAME_PASSWD = "kragha2000@gmail.com:123surya";
   private static final String GET_URL = "https://ragkrish.freshdesk.com/api/v2/tickets";
-  private static final String GET_URL2 = "https://ragkrish.freshdesk.com/api/v2/ticket_fields";
+  //private static final String GET_URL2 = "https://ragkrish.freshdesk.com/api/v2/ticket_fields";
   private static final String GET_SEARCH_TKT_URL = "https://ragkrish.freshdesk.com/api/v2/search/tickets?query=";
   private static final String POST_URL = "https://ragkrish.freshdesk.com/api/v2/tickets";
+  
   //private static final int INVALID_TICKET_ID = -1;
+  
   private static final int OK = 0;
   private static final int ERROR = -1;
-  private static final int RESOLVED = 4;
+  
+  private static final int TKT_STATUS_OPEN = 2;
+  private static final int TKT_STATUS_PENDING = 3;
+  private static final int TKT_STATUS_RESOLVED = 4;
  
   //private static final String POST_PARAMS = "-d {"description":"Details about the issue...","email":"tom@outerspace.com"}";
 
+  // public methods...
+  
   public static void main(String[] args) throws IOException 
   {
+    Scanner input = new Scanner(System.in);
+
     while(true)
     {
-      System.out.println("\nPress 1 for GET, 2 for POST, 3 for SEARCH-TKT, 4 for updating status to RESOLVED, 5 for Exit \n");
-      int option = System.in.read();
-  
-      if (option == '1')
+      System.out.println("\nPress 1 for GET, 2 for POST, 3 for SEARCH-TKT, " +
+          "4 for updating status to RESOLVED, 5 for Exit \n");
+      int option = input.nextInt();
+      //int option = System.in.read();
+      System.out.println("option is: " + option);
+      
+      if (option == 1)
       {
-        sendGET();
+        getAllTickets();
         System.out.println("GET DONE");
       }
-      else if (option == '2')
+      else if (option == 2)
       {
-        sendPOST("point1", 1);
+        createTicket("point1", 1);
         System.out.println("POST DONE");
       }
-      else if (option == '3')
+      else if (option == 3)
       {
-        int id = searchTicket("point1");
-        System.out.println("Search GET DONE" + "tktId:" + id);
+        int id = searchOpenTicket("point1");
+        System.out.println("Search GET DONE\n" + "tktId:" + id);
       }
-      else if (option == '4')
+      else if (option == 4)
       {
-        int id = updateTicket("point1",RESOLVED);
-        System.out.println("UPDATE DONE" + "tktId:" + id);
+         int id = updateTicket("point1", TKT_STATUS_RESOLVED);
+        System.out.println("UPDATE DONE.. " + "tktId:" + id + 
+                           "  status set to: " + TKT_STATUS_RESOLVED);
       }
-      else if (option == '5')
+      else if (option == 5)
       {
         System.out.println("Exiting...");
-        return;
+        break;
       }
-    }    
+    }
+    input.close();
   }
 
-  /* START sendGET */
-  private static void sendGET() throws IOException
+  /* START getAllTickets */
+  private static void getAllTickets() throws IOException
   
   {
     URL obj = new URL(GET_URL);
@@ -75,7 +90,8 @@ public class LeanovateHttpUrlConnection
     con.setRequestProperty("content-type", "application/json; charset=utf-8");
     
     String userpass = USERNAME_PASSWD;
-    String basicAuth = "Basic " + javax.xml.bind.DatatypeConverter.printBase64Binary(userpass.getBytes());
+    String basicAuth = "Basic " + 
+        javax.xml.bind.DatatypeConverter.printBase64Binary(userpass.getBytes());
     con.setRequestProperty ("Authorization", basicAuth);    
         
     int responseCode = con.getResponseCode();
@@ -103,14 +119,22 @@ public class LeanovateHttpUrlConnection
 
       System.out.println(response.toString());
   }
-/* END sendGET */
+/* END getAllTickets */
   
   /* START searchTicket */  
-  private static int searchTicket(String pointName) throws IOException
+  /* searches server for tkt with pointname as pointName. returns tkt:id if found. 
+   * returns ERROR(-1) if not found */
+  private static int searchOpenTicket(String pointName) throws IOException
   
   {
     String queryField = "pointname";
-    String FilterGetUrl = GET_SEARCH_TKT_URL + "\"" + queryField + ":" + pointName + "\"";
+    String FilterGetUrl = GET_SEARCH_TKT_URL + "\"" +
+        "((status:" + TKT_STATUS_OPEN + " OR " + "status:" + TKT_STATUS_PENDING + ")" +    
+       " AND " + 
+        "(" + queryField + ":" + "\'" + pointName + "\'" + "))" +
+        "\"";
+    FilterGetUrl = FilterGetUrl.replaceAll(" ", "%20");
+    
     System.out.println("searchTkt: url: " + FilterGetUrl);    
     
     URL obj = new URL(FilterGetUrl);
@@ -123,7 +147,8 @@ public class LeanovateHttpUrlConnection
     con.setRequestProperty("content-type", "application/json; charset=utf-8");
     
     String userpass = USERNAME_PASSWD;
-    String basicAuth = "Basic " + javax.xml.bind.DatatypeConverter.printBase64Binary(userpass.getBytes());
+    String basicAuth = "Basic " + 
+        javax.xml.bind.DatatypeConverter.printBase64Binary(userpass.getBytes());
     con.setRequestProperty ("Authorization", basicAuth);    
         
     int responseCode = con.getResponseCode();
@@ -172,16 +197,19 @@ public class LeanovateHttpUrlConnection
             // v expect 1 tkt per point. this is unexpected when more than 1 tkt matches a point name. log it
             System.out.println("More than one tkt for same point found. unexpected error!");
           }
-          // atleast 1 entry found. get 1st entry. assuming 1 unique match as we already searched on pointname. we are assuming
+          // atleast 1 entry found. get 1st entry. 
+          // assuming 1 unique match as we already searched on pointname. 
+          // we are assuming
           // for each point, only 1 tkt will be created. ASSUME
           id = rspJsonObj.getJSONArray("results").getJSONObject(0).getInt("id");
-        
-          System.out.println("ID: " + id);    
+          int status = rspJsonObj.getJSONArray("results").getJSONObject(0).getInt("status");
+          System.out.println("ID: " + id + " status:" + status);    
           return id;
         }
         else
         {
-          System.out.println("total 0. unexpected when search passed!");    
+          System.out.println("total 0. no open/pending tkts found with pointname: " 
+                + pointName);    
           return ERROR;
         }
       }
@@ -192,8 +220,8 @@ public class LeanovateHttpUrlConnection
   }
 /* END searchTicket */
   
-/* START sendPOST */
-  private static int sendPOST(String pointName, int priority) throws IOException 
+/* START createTicket */
+  private static int createTicket(String pointName, int priority) throws IOException 
   {   
     int retCode = OK;
     URL obj = new URL(POST_URL);
@@ -276,6 +304,91 @@ public class LeanovateHttpUrlConnection
 
       return retCode;
   }  
-/* END sendPOST */  
+/* END createTicket */  
+
+/* START updateTicket */
+  private static int updateTicket(String pointName, int newStatus) throws IOException 
+  {   
+    int retCode = OK;
+    
+    int tktId = searchOpenTicket(pointName);
+    // TODO: check also that tkt status is non-resolved..  
+    
+    if (tktId == ERROR)
+    {
+      // TODO: check if this is real scenario. ex: tkt got created when alarm happenned. 
+      // operator resolved tkt. alarm later cleared. 
+      System.out.println("updateTicket: Could not find ticket at server with point-name as: " + pointName);
+      return ERROR;
+    }
+    // tkt found. send PUT and update status field
+    
+    URL obj = new URL(POST_URL + "/" + tktId);  // PUT url/tickets/<id>
+    HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+    con.setRequestMethod("PUT");
+    con.setRequestProperty("User-Agent", USER_AGENT);
+
+    con.setRequestProperty("content-type", "application/json; charset=utf-8");
+    
+    String userpass = USERNAME_PASSWD;
+    String basicAuth = "Basic " + javax.xml.bind.DatatypeConverter.printBase64Binary(userpass.getBytes());
+    con.setRequestProperty ("Authorization", basicAuth);               
+    
+    String params;
+    try
+    {
+      JSONObject json = new JSONObject();
+
+      // update just the status. leave remaining tkt fields as is
+      json.put("status", newStatus);
+
+      params = json.toString();
+      System.out.println("updateTicket: params:"+ params);
+    }
+    catch (JSONException e)
+    {
+      System.out.println("updateTicket: PUT: json exception!!");
+      System.out.println("updateTicket: Aborting PUT");
+      return ERROR;
+    }
+
+    // For POST/PUT only - START
+    con.setDoOutput(true);
+    OutputStream os = con.getOutputStream();
+    os.write(params.getBytes());
+    os.flush();
+    os.close();
+    // For POST/PUT only - END
+
+    int responseCode = con.getResponseCode();
+    System.out.println("updateTicket: PUT Response Code :: " + responseCode);
+
+    BufferedReader in;
+    if (responseCode == HttpURLConnection.HTTP_OK) 
+    {   
+      in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+      System.out.println("updateTicket: PUT OK. Ticket Updated!!");
+      retCode = OK;
+    } 
+    else 
+    {
+      in = new BufferedReader(new InputStreamReader(con.getErrorStream()));
+      System.out.println("updateTicket: PUT ERROR!");
+      retCode = ERROR;
+    }    
+    
+      String inputLine;
+      StringBuffer response = new StringBuffer();
+
+      while ((inputLine = in.readLine()) != null) {
+        response.append(inputLine);
+      }
+      in.close();
+
+      System.out.println(response.toString());
+
+      return retCode;
+  }  
+/* END updateTicket */  
   
 }
