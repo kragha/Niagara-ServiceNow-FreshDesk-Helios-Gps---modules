@@ -15,15 +15,13 @@ import org.json.JSONObject;
 
 public class LeanovateHttpUrlConnection 
 {
+
   // constants
   private static final String USER_AGENT = "niagara-leanovate/1.0";
   private static final String USERNAME_PASSWD = "kragha2000@gmail.com:123surya";
   private static final String GET_URL = "https://ragkrish.freshdesk.com/api/v2/tickets";
-  //private static final String GET_URL2 = "https://ragkrish.freshdesk.com/api/v2/ticket_fields";
   private static final String GET_SEARCH_TKT_URL = "https://ragkrish.freshdesk.com/api/v2/search/tickets?query=";
   private static final String POST_URL = "https://ragkrish.freshdesk.com/api/v2/tickets";
-  
-  //private static final int INVALID_TICKET_ID = -1;
   
   private static final int OK = 0;
   private static final int ERROR = -1;
@@ -31,55 +29,13 @@ public class LeanovateHttpUrlConnection
   private static final int TKT_STATUS_OPEN = 2;
   private static final int TKT_STATUS_PENDING = 3;
   private static final int TKT_STATUS_RESOLVED = 4;
- 
-  //private static final String POST_PARAMS = "-d {"description":"Details about the issue...","email":"tom@outerspace.com"}";
-
-  // public methods...
   
-  public static void main(String[] args) throws IOException 
-  {
-    Scanner input = new Scanner(System.in);
-
-    while(true)
-    {
-      System.out.println("\nPress 1 for GET, 2 for POST, 3 for SEARCH-TKT, " +
-          "4 for updating status to RESOLVED, 5 for Exit \n");
-      int option = input.nextInt();
-      //int option = System.in.read();
-      System.out.println("option is: " + option);
-      
-      if (option == 1)
-      {
-        getAllTickets();
-        System.out.println("GET DONE");
-      }
-      else if (option == 2)
-      {
-        createTicket("point1", 1);
-        System.out.println("POST DONE");
-      }
-      else if (option == 3)
-      {
-        int id = searchOpenTicket("point1");
-        System.out.println("Search GET DONE\n" + "tktId:" + id);
-      }
-      else if (option == 4)
-      {
-         int id = updateTicket("point1", TKT_STATUS_RESOLVED);
-        System.out.println("UPDATE DONE.. " + "tktId:" + id + 
-                           "  status set to: " + TKT_STATUS_RESOLVED);
-      }
-      else if (option == 5)
-      {
-        System.out.println("Exiting...");
-        break;
-      }
-    }
-    input.close();
-  }
+  private static final int TKT_PRTY_HIGH = 3;
+ 
+  // public methods...
 
   /* START getAllTickets */
-  private static void getAllTickets() throws IOException
+  private void getAllTickets() throws IOException
   
   {
     URL obj = new URL(GET_URL);
@@ -129,9 +85,11 @@ public class LeanovateHttpUrlConnection
   {
     String queryField = "pointname";
     String FilterGetUrl = GET_SEARCH_TKT_URL + "\"" +
-        "((status:" + TKT_STATUS_OPEN + " OR " + "status:" + TKT_STATUS_PENDING + ")" +    
+        "(status:" + TKT_STATUS_OPEN + 
+        " OR " + "status:" + TKT_STATUS_PENDING + 
+        ")" +    
        " AND " + 
-        "(" + queryField + ":" + "\'" + pointName + "\'" + "))" +
+        queryField + ":"  + pointName + 
         "\"";
     FilterGetUrl = FilterGetUrl.replaceAll(" ", "%20");
     
@@ -181,42 +139,51 @@ public class LeanovateHttpUrlConnection
       
       System.out.println("RESPONSE STRING: " + rspString);
       
-      if (retCode == OK)
+      try
       {
-        // we got results. 
-        // check total > 0 if found. then look for result[] and find id field
-        
-        JSONObject rspJsonObj = new JSONObject(rspString);
-        int id;
-        
-        int total = rspJsonObj.getInt("total");
-        if (total > 0)
+        if (retCode == OK)
         {
-          if (total > 1)
+          // we got results. 
+          // check total > 0 if found. then look for result[] and find id field
+          
+          JSONObject rspJsonObj = new JSONObject(rspString);
+          int id;
+          
+          int total = rspJsonObj.getInt("total");
+          if (total > 0)
           {
-            // v expect 1 tkt per point. this is unexpected when more than 1 tkt matches a point name. log it
-            System.out.println("More than one tkt for same point found. unexpected error!");
+            if (total > 1)
+            {
+              // v expect 1 tkt per point. this is unexpected when more than 1 tkt matches a point name. log it
+              System.out.println("More than one tkt for same point found. unexpected error!");
+            }
+            // atleast 1 entry found. get 1st entry. 
+            // assuming 1 unique match as we already searched on pointname. 
+            // we are assuming
+            // for each point, only 1 tkt will be created. ASSUME
+            id = rspJsonObj.getJSONArray("results").getJSONObject(0).getInt("id");
+            int status = rspJsonObj.getJSONArray("results").getJSONObject(0).getInt("status");
+            System.out.println("ID: " + id + " status:" + status);    
+            return id;
           }
-          // atleast 1 entry found. get 1st entry. 
-          // assuming 1 unique match as we already searched on pointname. 
-          // we are assuming
-          // for each point, only 1 tkt will be created. ASSUME
-          id = rspJsonObj.getJSONArray("results").getJSONObject(0).getInt("id");
-          int status = rspJsonObj.getJSONArray("results").getJSONObject(0).getInt("status");
-          System.out.println("ID: " + id + " status:" + status);    
-          return id;
+          else
+          {
+            System.out.println("total 0. no open/pending tkts found with pointname: " 
+                  + pointName);    
+            return ERROR;
+          }
         }
         else
         {
-          System.out.println("total 0. no open/pending tkts found with pointname: " 
-                + pointName);    
           return ERROR;
         }
-      }
-      else
+      }  //try
+      catch (JSONException e)
       {
+        System.out.println("searchOpenTicket: json exception!!. Aborting search..");
         return ERROR;
       }
+      
   }
 /* END searchTicket */
   
@@ -242,12 +209,11 @@ public class LeanovateHttpUrlConnection
       json.put("email", "test@test.com");
       json.put("description", "Temperature Alarm detected by Niagara!");
       json.put("subject","Niagara Alarm Ticket: Fix AC/Heater via command centre");
- 
       
-      String[] tmpStrArray = new String[2];
-      tmpStrArray[0] = pointName;
+ //     String[] tmpStrArray = new String[2];
+ //     tmpStrArray[0] = pointName;   
+ //     json.put("tags",  tmpStrArray);
       
-      json.put("tags",  tmpStrArray);
       json.put("priority", priority);
       json.put("status", 2);
 
@@ -307,11 +273,11 @@ public class LeanovateHttpUrlConnection
 /* END createTicket */  
 
 /* START updateTicket */
-  private static int updateTicket(String pointName, int newStatus) throws IOException 
+  private static int updateTicket(int tktId, String pointName, int newStatus) throws IOException 
   {   
     int retCode = OK;
     
-    int tktId = searchOpenTicket(pointName);
+/*    int tktId = searchOpenTicket(pointName);
     // TODO: check also that tkt status is non-resolved..  
     
     if (tktId == ERROR)
@@ -322,6 +288,7 @@ public class LeanovateHttpUrlConnection
       return ERROR;
     }
     // tkt found. send PUT and update status field
+*/
     
     URL obj = new URL(POST_URL + "/" + tktId);  // PUT url/tickets/<id>
     HttpURLConnection con = (HttpURLConnection) obj.openConnection();
@@ -389,6 +356,85 @@ public class LeanovateHttpUrlConnection
 
       return retCode;
   }  
-/* END updateTicket */  
+/* END updateTicket */    
   
-}
+/* START main */  
+  public static void main(String[] args) throws IOException
+  {
+    Scanner input = new Scanner(System.in);
+    int childId = 1;
+    
+    while(true)
+    {
+      System.out.println("\nPress 1 for GET, 2 for POST, 3 for SEARCH-TKT, " +
+          "4 for updating status to RESOLVED, 5 for Exit \n");
+      int option = input.nextInt();
+      //int option = System.in.read();
+      System.out.println("option is: " + option);
+      
+      if (option == 1)
+      {
+        System.out.println("Starting child thread with ID: " + childId);
+        Runnable r = new AlarmConsumer(childId++);
+        Thread child = new Thread(r);
+        child.setDaemon(true);
+        child.start();
+        
+        //new Thread(AlarmConsumer).start();
+
+        //getAllTickets();
+        System.out.println("GET DONE");
+      }
+      else if (option == 2)
+      {
+        createTicket("point1", 1);
+        System.out.println("POST DONE");
+      }
+      else if (option == 3)
+      {
+        int id = searchOpenTicket("point1");
+        System.out.println("Search GET DONE\n" + "tktId:" + id);
+      }
+      else if (option == 4)
+      {
+          int id = searchOpenTicket("point1");
+          if (id != ERROR)
+          {
+            int ret = updateTicket(id, "point1", TKT_STATUS_RESOLVED);
+            System.out.println("UPDATE DONE.. " + "retcode:" + ret + 
+                           "  status set to: " + TKT_STATUS_RESOLVED);
+          }
+          else
+            System.out.println("search error!"); 
+             
+      }
+      else if (option == 5)
+      {
+        System.out.println("Exiting...");
+        break;
+      }
+    }
+    input.close();
+  }
+/* END main */   
+
+  
+} // class urlconnection
+
+class MonitorThreads  implements Runnable
+{
+  public void run()
+  {
+    try
+    {
+        while(true)
+        {
+            Thread.sleep(5000);
+        }
+    }
+    catch (InterruptedException e)
+    {
+      System.out.println("InterruptedException");
+    }
+  }
+} //class monitor
