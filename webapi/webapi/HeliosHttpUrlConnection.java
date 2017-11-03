@@ -3,7 +3,7 @@ package webapi;
 import java.io.IOException;
 import java.util.Scanner;
 
-public class LeanovateHttpUrlConnection 
+public class HeliosHttpUrlConnection 
 {
   private static final int ERROR = -1;
   private static final int TKT_STATUS_RESOLVED = 4;
@@ -14,7 +14,7 @@ public class LeanovateHttpUrlConnection
   public  boolean monitorThreadStarted;
   public  int runningThreads;
   
-  public LeanovateHttpUrlConnection()
+  public HeliosHttpUrlConnection()
   {
     System.out.println("Creating Thread Data Share...");
     threadDataShare = new ThreadDataShare[MAX_WORKER_THREADS];
@@ -23,7 +23,8 @@ public class LeanovateHttpUrlConnection
     {
       threadDataShare[i] = new ThreadDataShare();
     }
-    System.out.print("Starting Monitor thread...");
+
+/*    System.out.print("Starting Monitor thread...");
     
     Runnable r = new MonitorThread(MAX_WORKER_THREADS, threadDataShare);
     Thread child = new Thread(r);
@@ -34,6 +35,7 @@ public class LeanovateHttpUrlConnection
     monitorThreadStarted = true;
     
     runningThreads = 0;
+    */
   }
   
   public int getFreeWorkerThreadId()
@@ -50,11 +52,11 @@ public class LeanovateHttpUrlConnection
 /* START main */  
   public static void main(String[] args) throws IOException
   {
-    TicketHandler ticketHandler = new TicketHandler();
+    HeliosTicketHandler ticketHandler = new HeliosTicketHandler();
 
     Scanner input = new Scanner(System.in);
     
-    LeanovateHttpUrlConnection leanovateObj = new LeanovateHttpUrlConnection();
+    HeliosHttpUrlConnection leanovateObj = new HeliosHttpUrlConnection();
     
     while(true)
     {
@@ -124,7 +126,6 @@ public class LeanovateHttpUrlConnection
   
 } // class urlconnection
 
-/*
 
 // wakes up once X secs. runs through threaddatashare for abnormal stuff like errors. 
 // tries or initiates retries or logging where required. TODO: if some thread stuck, see what to do?
@@ -230,5 +231,3 @@ class AlarmObject
   int sourceState;
   int priority;
 }
-
-*/
